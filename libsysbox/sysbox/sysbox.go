@@ -39,10 +39,16 @@ var runDir = "/run/sysbox"
 
 func init() {
 	if dir := os.Getenv("SYSBOX_RUN_DIR"); dir != "" {
-		runDir = dir
-		sysboxMgrGrpc.SetSockAddr(path.Join(dir, "sysmgr.sock"))
-		sysboxFsGrpc.SetSockAddr(path.Join(dir, "sysfs.sock"))
+		SetRunDir(dir)
 	}
+}
+
+// SetRunDir overrides the sysbox runtime directory and updates gRPC socket addresses.
+// The --run-dir CLI flag takes precedence over the SYSBOX_RUN_DIR env var.
+func SetRunDir(dir string) {
+	runDir = dir
+	sysboxMgrGrpc.SetSockAddr(path.Join(dir, "sysmgr.sock"))
+	sysboxFsGrpc.SetSockAddr(path.Join(dir, "sysfs.sock"))
 }
 
 // Holds sysbox-specific config

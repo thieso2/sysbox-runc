@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/nestybox/sysbox-runc/libsysbox/sysbox"
 	"github.com/opencontainers/runc/libcontainer/logs"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
@@ -78,6 +79,11 @@ func main() {
 			Value: root,
 			Usage: "root directory for storage of container state (this should be located in tmpfs)",
 		},
+		cli.StringFlag{
+			Name:  "run-dir",
+			Value: "/run/sysbox",
+			Usage: "directory for sysbox-mgr and sysbox-fs sockets; use to run multiple sysbox instances",
+		},
 		cli.BoolFlag{
 			Name:  "no-sysbox-fs",
 			Usage: "do not interact with sysbox-fs; meant for testing and debugging.",
@@ -126,6 +132,9 @@ func main() {
 	}
 
 	app.Before = func(context *cli.Context) error {
+		if context.IsSet("run-dir") {
+			sysbox.SetRunDir(context.GlobalString("run-dir"))
+		}
 		if !context.IsSet("root") && xdgRuntimeDir != "" {
 			// According to the XDG specification, we need to set anything in
 			// XDG_RUNTIME_DIR to have a sticky bit if we don't want it to get
