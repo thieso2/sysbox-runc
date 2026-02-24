@@ -20,6 +20,7 @@ package sysbox
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/nestybox/sysbox-ipc/sysboxFsGrpc"
@@ -148,8 +149,7 @@ func (fs *Fs) SendCreationTime(t time.Time) error {
 // trapping and waits for its response (ack).
 func (fs *Fs) SendSeccompInit(pid int, id string, seccompFd int32) error {
 
-	// TODO: Think about a better location for this one.
-	const seccompTracerSockAddr = "/run/sysbox/sysfs-seccomp.sock"
+	seccompTracerSockAddr := path.Join(runDir, "sysfs-seccomp.sock")
 
 	conn, err := unixIpc.Connect(seccompTracerSockAddr)
 	if err != nil {

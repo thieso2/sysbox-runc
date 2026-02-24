@@ -19,16 +19,31 @@ package sysbox
 import (
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"syscall"
 
+	"github.com/nestybox/sysbox-ipc/sysboxFsGrpc"
+	"github.com/nestybox/sysbox-ipc/sysboxMgrGrpc"
 	sh "github.com/nestybox/sysbox-libs/idShiftUtils"
 	linuxUtils "github.com/nestybox/sysbox-libs/linuxUtils"
 	libutils "github.com/nestybox/sysbox-libs/utils"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
+
+// runDir holds the sysbox runtime directory. It defaults to "/run/sysbox"
+// but can be overridden via the SYSBOX_RUN_DIR environment variable.
+var runDir = "/run/sysbox"
+
+func init() {
+	if dir := os.Getenv("SYSBOX_RUN_DIR"); dir != "" {
+		runDir = dir
+		sysboxMgrGrpc.SetSockAddr(path.Join(dir, "sysmgr.sock"))
+		sysboxFsGrpc.SetSockAddr(path.Join(dir, "sysfs.sock"))
+	}
+}
 
 // Holds sysbox-specific config
 type Sysbox struct {
