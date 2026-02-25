@@ -34,7 +34,13 @@ import (
 )
 
 // runDir holds the sysbox runtime directory. It defaults to "/run/sysbox"
-// but can be overridden via the SYSBOX_RUN_DIR environment variable.
+// but can be overridden via the --run-dir CLI flag or the SYSBOX_RUN_DIR env
+// var. The flag definition in main.go uses EnvVar:"SYSBOX_RUN_DIR" so urfave/cli
+// resolves the precedence: CLI flag > env var > default. app.Before then calls
+// SetRunDir unconditionally with the resolved value.
+//
+// This init() provides early initialization for code that may read runDir
+// before app.Before runs (e.g., during package init in other modules).
 var runDir = "/run/sysbox"
 
 func init() {
@@ -44,7 +50,6 @@ func init() {
 }
 
 // SetRunDir overrides the sysbox runtime directory and updates gRPC socket addresses.
-// The --run-dir CLI flag takes precedence over the SYSBOX_RUN_DIR env var.
 func SetRunDir(dir string) {
 	runDir = dir
 	sysboxMgrGrpc.SetSockAddr(path.Join(dir, "sysmgr.sock"))

@@ -80,9 +80,10 @@ func main() {
 			Usage: "root directory for storage of container state (this should be located in tmpfs)",
 		},
 		cli.StringFlag{
-			Name:  "run-dir",
-			Value: "/run/sysbox",
-			Usage: "directory for sysbox-mgr and sysbox-fs sockets; use to run multiple sysbox instances",
+			Name:   "run-dir",
+			Value:  "/run/sysbox",
+			Usage:  "directory for sysbox-mgr and sysbox-fs sockets; use to run multiple sysbox instances",
+			EnvVar: "SYSBOX_RUN_DIR",
 		},
 		cli.BoolFlag{
 			Name:  "no-sysbox-fs",
@@ -132,14 +133,11 @@ func main() {
 	}
 
 	app.Before = func(context *cli.Context) error {
-		// Apply --run-dir when explicitly passed on the CLI. This takes
-		// precedence over the SYSBOX_RUN_DIR env var (processed in init()).
-		// Use GlobalIsSet — not IsSet — because urfave/cli v1's IsSet does
-		// not detect global flags passed before a subcommand (e.g.,
-		// "sysbox-runc --run-dir /x create ...").
-		if context.GlobalIsSet("run-dir") {
-			sysbox.SetRunDir(context.GlobalString("run-dir"))
-		}
+		// Always apply --run-dir (even if set to the default) so that the CLI
+		// flag takes precedence over the SYSBOX_RUN_DIR env var processed in
+		// init(). Using GlobalString avoids urfave/cli v1 quirks where IsSet
+		// may not detect global flags passed before a subcommand.
+		sysbox.SetRunDir(context.GlobalString("run-dir"))
 
 		if !context.IsSet("root") && xdgRuntimeDir != "" {
 			// According to the XDG specification, we need to set anything in
