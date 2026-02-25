@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/nestybox/sysbox-runc/libsysbox/sysbox"
 	"github.com/opencontainers/runc/libcontainer/logs"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
@@ -80,10 +79,9 @@ func main() {
 			Usage: "root directory for storage of container state (this should be located in tmpfs)",
 		},
 		cli.StringFlag{
-			Name:   "run-dir",
-			Value:  "/run/sysbox",
-			Usage:  "directory for sysbox-mgr and sysbox-fs sockets; use to run multiple sysbox instances",
-			EnvVar: "SYSBOX_RUN_DIR",
+			Name:  "run-dir",
+			Value: "/run/sysbox",
+			Usage: "directory for sysbox-mgr and sysbox-fs sockets; use to run multiple sysbox instances",
 		},
 		cli.BoolFlag{
 			Name:  "no-sysbox-fs",
@@ -133,12 +131,6 @@ func main() {
 	}
 
 	app.Before = func(context *cli.Context) error {
-		// Always apply --run-dir (even if set to the default) so that the CLI
-		// flag takes precedence over the SYSBOX_RUN_DIR env var processed in
-		// init(). Using GlobalString avoids urfave/cli v1 quirks where IsSet
-		// may not detect global flags passed before a subcommand.
-		sysbox.SetRunDir(context.GlobalString("run-dir"))
-
 		if !context.IsSet("root") && xdgRuntimeDir != "" {
 			// According to the XDG specification, we need to set anything in
 			// XDG_RUNTIME_DIR to have a sticky bit if we don't want it to get

@@ -34,16 +34,35 @@ import (
 )
 
 // runDir holds the sysbox runtime directory. It defaults to "/run/sysbox"
-// but can be overridden via the --run-dir CLI flag or the SYSBOX_RUN_DIR env
-// var. The flag definition in main.go uses EnvVar:"SYSBOX_RUN_DIR" so urfave/cli
-// resolves the precedence: CLI flag > env var > default. app.Before then calls
-// SetRunDir unconditionally with the resolved value.
+// but can be overridden via --run-dir on the CLI or the SYSBOX_RUN_DIR env var.
+// Precedence: --run-dir flag > SYSBOX_RUN_DIR env var > default.
 //
-// This init() provides early initialization for code that may read runDir
-// before app.Before runs (e.g., during package init in other modules).
+// Both sources are resolved in init() by scanning os.Args and os.Getenv,
+// bypassing urfave/cli v1 entirely. This is necessary because urfave/cli v1's
+// context.GlobalString does not reliably return global flag values when called
+// from app.Before with a subcommand present (e.g., "sysbox-runc --run-dir /x create ...").
 var runDir = "/run/sysbox"
 
 func init() {
+	// CLI flag takes highest precedence — scan os.Args directly because
+	// init() runs before urfave/cli parses anything.
+	for i, arg := range os.Args[1:] {
+		if arg == "--run-dir" || arg == "-run-dir" {
+			if i+1 < len(os.Args)-1 {
+				SetRunDir(os.Args[i+2])
+				return
+			}
+		}
+		if strings.HasPrefix(arg, "--run-dir=") {
+			SetRunDir(strings.TrimPrefix(arg, "--run-dir="))
+			return
+		}
+		if strings.HasPrefix(arg, "-run-dir=") {
+			SetRunDir(strings.TrimPrefix(arg, "-run-dir="))
+			return
+		}
+	}
+	// Fall back to env var.
 	if dir := os.Getenv("SYSBOX_RUN_DIR"); dir != "" {
 		SetRunDir(dir)
 	}
