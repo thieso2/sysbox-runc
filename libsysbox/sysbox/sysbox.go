@@ -50,8 +50,11 @@ func init() {
 }
 
 // SetRunDir overrides the sysbox runtime directory and updates gRPC socket addresses.
+// It also sets the SYSBOX_RUN_DIR env var so that re-exec'd child processes
+// (e.g., "sysbox-runc init") inherit the value.
 func SetRunDir(dir string) {
 	runDir = dir
+	os.Setenv("SYSBOX_RUN_DIR", dir)
 	sysboxMgrGrpc.SetSockAddr(path.Join(dir, "sysmgr.sock"))
 	sysboxFsGrpc.SetSockAddr(path.Join(dir, "sysfs.sock"))
 }
