@@ -132,9 +132,15 @@ func main() {
 	}
 
 	app.Before = func(context *cli.Context) error {
-		if context.IsSet("run-dir") {
+		// Apply --run-dir when explicitly passed on the CLI. This takes
+		// precedence over the SYSBOX_RUN_DIR env var (processed in init()).
+		// Use GlobalIsSet — not IsSet — because urfave/cli v1's IsSet does
+		// not detect global flags passed before a subcommand (e.g.,
+		// "sysbox-runc --run-dir /x create ...").
+		if context.GlobalIsSet("run-dir") {
 			sysbox.SetRunDir(context.GlobalString("run-dir"))
 		}
+
 		if !context.IsSet("root") && xdgRuntimeDir != "" {
 			// According to the XDG specification, we need to set anything in
 			// XDG_RUNTIME_DIR to have a sticky bit if we don't want it to get
