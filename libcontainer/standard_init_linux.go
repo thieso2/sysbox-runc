@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 
 	sysboxmount "github.com/nestybox/sysbox-libs/mount"
 	"github.com/opencontainers/runc/internals/pathrs"
@@ -25,6 +26,27 @@ type linuxStandardInit struct {
 	parentPid     int
 	fifoFile      *os.File
 	config        *initConfig
+}
+
+var execFifoReopen = pathrs.Reopen
+
+func reopenExecFifo(fifoFile *os.File) (*os.File, error) {
+	reopened, err := execFifoReopen(fifoFile, unix.O_WRONLY|unix.O_CLOEXEC)
+	if err == nil {
+		return reopened, nil
+	}
+
+	// Keep the legacy /proc/self/fd fallback scoped to the exec FIFO. The
+	// runtime already owns this O_PATH handle, and older sysbox-runc releases
+	// relied on this reopen path successfully on kernels where pathrs-lite now
+	// fails inside the container's userns + sysbox-fs procfs view.
+	procPath := "/proc/self/fd/" + strconv.Itoa(int(fifoFile.Fd()))
+	fd, procErr := unix.Open(procPath, unix.O_WRONLY|unix.O_CLOEXEC, 0)
+	if procErr != nil {
+		return nil, errors.Wrapf(procErr, "fallback reopen via %s after secure reopen failed: %v", procPath, err)
+	}
+
+	return os.NewFile(uintptr(fd), procPath), nil
 }
 
 // sysbox-runc: info passed when the sys container's init process requests its parent runc
@@ -301,7 +323,7 @@ func (l *linuxStandardInit) Init() error {
 	// user process. We open it through /proc/self/fd/$fd, because the fd that
 	// was given to us was an O_PATH fd to the fifo itself. Linux allows us to
 	// re-open an O_PATH fd through /proc.
-	fifoFile, err := pathrs.Reopen(l.fifoFile, unix.O_WRONLY|unix.O_CLOEXEC)
+	fifoFile, err := reopenExecFifo(l.fifoFile)
 	if err != nil {
 		return newSystemErrorWithCause(err, "reopen exec fifo")
 	}
