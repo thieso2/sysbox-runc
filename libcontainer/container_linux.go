@@ -2864,16 +2864,22 @@ func (c *linuxContainer) setupIDMappedMounts() error {
 					return newSystemErrorWithCausef(err, "checking for ID-mapped mount support on bind source %s", m.Source)
 				}
 
-				if !idMapMntAllowed {
-					continue
-				}
-
-				needIDMap, err := needUidShiftOnBindSrc(m, config)
+				needShift, err := needUidShiftOnBindSrc(m, config)
 				if err != nil {
 					return newSystemErrorWithCause(err, "checking uid shifting on bind source")
 				}
 
-				m.IDMappedMount = needIDMap
+				if idMapMntAllowed {
+					m.IDMappedMount = needShift
+				} else if needShift {
+					// The filesystem doesn't support ID-mapped mounts
+					// (e.g., BTRFS). Fall back to chown-based UID
+					// shifting so the container can access the bind
+					// mount source.
+					if err := chownBindMountSource(m, config); err != nil {
+						return newSystemErrorWithCausef(err, "chown fallback for bind source %s", m.Source)
+					}
+				}
 			}
 		}
 	}
@@ -2920,6 +2926,31 @@ func needUidShiftOnBindSrc(mount *configs.Mount, config *configs.Config) (bool, 
 	}
 
 	return true, nil
+}
+
+// chownBindMountSource chowns a bind mount source directory to match the
+// container's user namespace UID/GID mapping. This is the fallback when
+// ID-mapped mounts are not supported on the filesystem (e.g., BTRFS).
+func chownBindMountSource(mount *configs.Mount, config *configs.Config) error {
+	var hostUid, hostGid uint32
+	for _, mapping := range config.UidMappings {
+		if mapping.ContainerID == 0 {
+			hostUid = uint32(mapping.HostID)
+		}
+	}
+	for _, mapping := range config.GidMappings {
+		if mapping.ContainerID == 0 {
+			hostGid = uint32(mapping.HostID)
+		}
+	}
+
+	uidOffset := int32(hostUid) - int32(mount.BindSrcInfo.Uid)
+	gidOffset := int32(hostGid) - int32(mount.BindSrcInfo.Gid)
+
+	logrus.Infof("chown fallback for bind mount %s -> %s (uid offset %d, gid offset %d)",
+		mount.Source, mount.Destination, uidOffset, gidOffset)
+
+	return sh.ShiftIdsWithChown(mount.Source, uidOffset, gidOffset)
 }
 
 // Checks if the file at the given path is a bind-mount; if so, returns true and
