@@ -2875,9 +2875,13 @@ func (c *linuxContainer) setupIDMappedMounts() error {
 					// The filesystem doesn't support ID-mapped mounts
 					// (e.g., BTRFS). Fall back to chown-based UID
 					// shifting so the container can access the bind
-					// mount source.
-					if err := chownBindMountSource(m, config); err != nil {
-						return newSystemErrorWithCausef(err, "chown fallback for bind source %s", m.Source)
+					// mount source. Only chown directories — device
+					// files and other non-dirs should be left alone.
+					fi, statErr := os.Stat(m.Source)
+					if statErr == nil && fi.IsDir() {
+						if err := chownBindMountSource(m, config); err != nil {
+							return newSystemErrorWithCausef(err, "chown fallback for bind source %s", m.Source)
+						}
 					}
 				}
 			}
